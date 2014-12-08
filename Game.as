@@ -17,44 +17,50 @@ package {
 		var ticks = 0;
 		var guests = [];
 
-		var floatingPoints = 0;
-		var floatX = 280;
-		var floatY = 100;
-		var floatYSpeed = -0.1;
+		var pts = [];
+
 		var totalPoints = 0;
 
 		function addTotalPoints(pts) {
 			totalPoints += pts;
 		}
 
-		function awardPoints(pts) {
-			if (pts > 0) {
+		function awardPoints(amount, x) {
+			if (amount > 0) {
 				new GoodSound().play();
 			} else {
 				new BadSound().play();
 			}
 
-			floatingPoints = pts;
-			floatYSpeed = -2.0;
-			floatY = 100;
+			var f = new FloatingPoints();
+			f.amount = amount;
+			f.ySpeed = -2.0;
+			f.x = x;
+			f.y = 100;
+			pts.push(f);
 		}
 
 		function drawFloatingPoints() {
-			if (floatingPoints === 0) {
-				return;
+
+			var matrix;
+
+			for each (var p in pts) {
+				var tf = new TextField();
+				var format = new TextFormat();
+				format.size = 20;
+				format.color = 0xff00ff00;
+				tf.defaultTextFormat = format;
+				matrix = new Matrix();
+				matrix.translate(p.x + 5, p.y);
+				tf.text = "+" + p.amount;
+				frontbufferBitmapData.draw(tf, matrix);
 			}
 
-			var tf = new TextField();
-			var format = new TextFormat();
-			format.size = 20;
-			tf.setTextFormat(format);
-			var matrix = new Matrix();
-			matrix.translate(floatX, floatY);
-			tf.text = "" + floatingPoints;
-			frontbufferBitmapData.draw(tf, matrix);
-
-			floatY += floatYSpeed;
-			floatYSpeed *= 0.94;
+			var t = new TextField();
+			t.text = "" + totalPoints + " points";
+			matrix = new Matrix();
+			matrix.translate(200, 182);
+			frontbufferBitmapData.draw(t, matrix);
 		}
 
 		function minPos() {
@@ -67,21 +73,48 @@ package {
 			return m;
 		}
 
+		var gameOver = false;
+
+		function fail() {
+			gameOver = true;
+			new BadSound().play();
+
+			var failField = new TextField();
+			failField.x = 130;
+			failField.y = 15;
+			failField.width = 180;
+			failField.height = 500;
+			failField.multiline = true;
+			failField.text = "You forgot " + guests[0].text + "'s name!\nHe got angry, your party failed.\nReload page to play again.";
+			addChild(failField);
+
+			removeChild(input);
+		}
+
 		function tick() {
+			if (gameOver) return;
+			ticks += 1;
 			if (inOpeningScreen) return;
 
-			if (Math.abs(floatYSpeed) < 0.1) {
-				addTotalPoints(floatingPoints);
-				floatingPoints = 0;
+			var newPts = [];
+			for each (var p in pts) {
+				p.y += p.ySpeed;
+				p.ySpeed *= 0.94;
+
+				if (Math.abs(p.ySpeed) < 0.1) {
+					addTotalPoints(p.amount);
+				} else {
+					newPts.push(p);
+				}
 			}
+			pts = newPts;
 
 			var now = getTimer();
 			var elapsedSeconds = (now - past)*0.001;
-			ticks += 1;
 			past = now;
 
-			if ((ticks % 1000) == 0) {
-				speed += 0.2;
+			if ((ticks % 400) == 0) {
+				speed += 0.1;
 			}
 
 			if (guests.length === 0 || minPos() > guestSpacing) {
@@ -91,6 +124,17 @@ package {
 			for each (var guest in guests) {
 				guest.tick(speed);
 			}
+
+			if (guests[0].pos > 280 && !guests[0].done) {
+				fail();
+				return;
+			}
+
+			if (guests[0].pos > 300) {
+				guests.shift();
+			}
+
+//			fail();
 		}
 
 		var bg:BitmapData;
@@ -101,6 +145,11 @@ package {
 				bg,
 				new Rectangle(0, 0, bg.width, 180),
 				new Point(0, 0)
+			);
+			frontbufferBitmapData.copyPixels(
+				bg,
+				new Rectangle(0, 360, bg.width, 20),
+				new Point(0, 180)
 			);
 		}
 
@@ -122,7 +171,11 @@ package {
 			copyPixels(40, 182, 40, 40, x - 1 + Math.sin(cycleOffset + ticks*0.1)*1, y - 12 + Math.sin(cycleOffset + ticks*0.1 + Math.PI)*1 + 1);
 
 			// head
-			copyPixels(80, 182, 40, 40, x - 3 + Math.sin(cycleOffset + ticks*0.1)*1, y - 26 + Math.sin(cycleOffset + ticks*0.1 + Math.PI/2)*1 + 2);
+			if (gameOver) {
+				copyPixels(80, 182 + spriteHeight, 40, 40, x - 3 + Math.sin(cycleOffset + ticks*0.1)*1, y - 26 + 2);
+			} else {
+				copyPixels(80, 182, 40, 40, x - 3 + Math.sin(cycleOffset + ticks*0.1)*1, y - 26 + Math.sin(cycleOffset + ticks*0.1 + Math.PI/2)*1 + 2);
+			}
 
 			// text that the player has to type
 			if (!done) {
@@ -146,6 +199,15 @@ package {
 			}
 		}
 
+		function isSomeoneNearHandshakers() {
+			for each (var g in guests) {
+				if (Math.abs(g.pos - 260) < 50) {
+					return true;
+				}
+			}
+			return false;
+		}
+
 		function drawHandShakingCouple() {
 			// brah
 			copyPixels(120, 182 + 40 * (Math.floor(ticks/20)%2), 40, 40, 260, 123);
@@ -157,13 +219,41 @@ package {
 		var openBitmapData;
 
 		function drawOpeningScreen() {
-			for (var i = 0; i < 320; i++) {
+			var i;
+			for (i = 0; i < 320; i++) {
 				frontbufferBitmapData.copyPixels(
 					openBitmapData,
-					new Rectangle(0, 0, 320, 200),
-					new Point(0, 0)
+					new Rectangle(0, i, 320, 1),
+					new Point(Math.sin(ticks * 0.2 + i*0.02) * 10, i)
 				);
 			}
+			for (i = 0; i < 320; i++) {
+				frontbufferBitmapData.copyPixels(
+					openBitmapData,
+					new Rectangle(i, 0, 1, 135),
+					new Point(i, Math.sin(i * 0.01 + ticks * 0.25 + Math.cos(i * 0.02 + ticks * 0.012)) * 5)
+				);
+			}
+		}
+
+		function openingScreenClosed() {
+			ticks = 0;
+			var format = new TextFormat();
+			format.size = 20;
+
+			input = new TextField();
+			input.text = "";
+			addChild(input);
+
+			input.y = 20;
+			input.x = 130;
+			input.width = 156;
+			input.height = 40;
+			input.setTextFormat(format);
+			input.type = TextFieldType.INPUT;
+			stage.focus = input;
+
+			addEventListener(KeyboardEvent.KEY_DOWN, didInput);
 		}
 
 		function render() {
@@ -190,25 +280,37 @@ package {
 
 		function didInput(event:KeyboardEvent){	
 			if (event.charCode == 13) {
-				awardPoints(10);
 
 				for each (var guest in guests) {
 					if (guest.done) continue;
 					if (guest.text == input.text) {
+						awardPoints(Math.floor(10 + speed*10), Math.max(DOOR_CENTER, guest.pos));
 						guest.done = true;
+						guest.text = 0;
 					}
 				}
 
 				input.text = "";
-				guests.shift();
 			}
 		}
 
 		var wordChoices = [
-			"foobar",
-			"foobar23",
-			"fooba12r",
-			"foob12ar",
+			"pekka",
+			"matti",
+			"teppo",
+			"sauli",
+			"marko",
+			"mika",
+			"bemmu",
+			"kari",
+			"matias",
+			"john",
+			"jack",
+			"kevin",
+			"bob",
+			"rauli",
+			"michael",
+			"sacha"
 		];
 
 		private function randomWord() {
@@ -221,8 +323,37 @@ package {
 			guest.pos = 0;
 			guest.cycleOffset = Math.random() * Math.PI*2;
 			guest.done = false;
-			guest.text = randomWord();
+
+			// Try until get a word that is not already in guest list
+			var word = randomWord();
+			var c = 0;
+			while (true) {
+				c++;
+				var wasNew = true;
+				for each (var g in guests) {
+					if (g.text == word) {
+						wasNew = false;
+						break;
+					}
+				}
+				if (wasNew) {
+					break;
+				}
+				if (c > 1000) {
+					trace("got stuck!");
+					return;
+				}
+			}
+
+			guest.text = word;
 			guests.push(guest);
+		}
+
+		private function mouseClick(evt) {
+			if (inOpeningScreen) {
+				inOpeningScreen = false;
+				openingScreenClosed();
+			}
 		}
 
 		public function Game() {
@@ -234,6 +365,7 @@ package {
 
 			frontbufferBitmapData = new BitmapData(320, 200, true, 0);
 			addChild(new Bitmap(frontbufferBitmapData));
+			stage.addEventListener(MouseEvent.CLICK, mouseClick); 
 			addEventListener(Event.ENTER_FRAME, refresh);
 
 			words = new TextField();
@@ -242,22 +374,8 @@ package {
 			words.y = 15;
 			addChild(words);
 
-			var format = new TextFormat();
-			format.size = 20;
-
-			input = new TextField();
-			input.text = "";
-			addChild(input);
-
-			input.y = 20;
-			input.x = 130;
-			input.width = 156;
-			input.height = 40;
-			input.setTextFormat(format);
-			input.type = TextFieldType.INPUT;
-			stage.focus = input;
-
-			addEventListener(KeyboardEvent.KEY_DOWN, didInput);
+//			inOpeningScreen = false;
+//			openingScreenClosed();
 		}
 	}
 }
@@ -271,4 +389,11 @@ class Guest {
 	public function tick(speed) {
 		pos += speed;
 	}
+}
+
+class FloatingPoints {
+	var amount = 0;
+	var x = 280;
+	var y = 100;
+	var ySpeed = -0.1;
 }
