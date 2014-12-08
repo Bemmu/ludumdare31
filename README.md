@@ -7,3 +7,4 @@ Playable at http://www.bemmu.com/linnanjuhlat/peli.html
 
 This was my Ludum Dare 31 entry. Theme was "entire game on one screen".
 
+![screenshot](http://www.bemmu.com/linnanjuhlat/screenshot.png)
