@@ -230,8 +230,8 @@ package {
 			for (i = 0; i < 320; i++) {
 				frontbufferBitmapData.copyPixels(
 					openBitmapData,
-					new Rectangle(i, 0, 1, 135),
-					new Point(i, Math.sin(i * 0.01 + ticks * 0.25 + Math.cos(i * 0.02 + ticks * 0.012)) * 5)
+					new Rectangle(i, 0, 1, 132),
+					new Point(i, Math.sin(i * 0.01 + ticks * 0.25 + Math.cos(i * 0.02 + ticks * 0.012)) * 3)
 				);
 			}
 		}
@@ -310,7 +310,9 @@ package {
 			"bob",
 			"rauli",
 			"michael",
-			"sacha"
+			"sacha",
+			"tomi",
+			"jorma"
 		];
 
 		private function randomWord() {
